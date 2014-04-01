@@ -45,6 +45,9 @@ public class AnimatedExpandableListView extends ExpandableListView {
     }
     
     public boolean expandGroupWithAnimation(int groupPos) {
+        if (groupPos + 1 == adapter.getGroupCount()) {
+            return expandGroup(groupPos);
+        }
         int childPos = getPackedPositionChild(getExpandableListPosition(getFirstVisiblePosition()));
         childPos = childPos == -1 ? 0 : childPos;
         adapter.startExpandAnimation(groupPos, childPos);
@@ -52,6 +55,14 @@ public class AnimatedExpandableListView extends ExpandableListView {
     }
     
     public boolean collapseGroupWithAnimation(int groupPos) {
+        int groupFlatPos = getFlatListPosition(getPackedPositionForGroup(groupPos));
+        if (groupFlatPos != -1) {
+            View v = getChildAt(groupFlatPos - getFirstVisiblePosition());
+            if (v.getBottom() >= getBottom()) {
+                return collapseGroup(groupPos);
+            }
+        }
+        
         int childPos = getPackedPositionChild(getExpandableListPosition(getFirstVisiblePosition()));
         childPos = childPos == -1 ? 0 : childPos;
         adapter.startCollapseAnimation(groupPos, childPos);
@@ -178,7 +189,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 }
                 
                 if (info.expanding) {
-                    ExpandAnimation ani = new ExpandAnimation(dummyView, 1, totalHeight, info);
+                    ExpandAnimation ani = new ExpandAnimation(dummyView, 0, totalHeight, info);
                     ani.setDuration(this.parent.getAnimationDuration());
                     ani.setAnimationListener(new AnimationListener() {
 

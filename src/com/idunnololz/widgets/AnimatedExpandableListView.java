@@ -302,13 +302,34 @@ public class AnimatedExpandableListView extends ExpandableListView {
         @Override
         public final View getChildView(final int groupPosition, int childPosition, boolean isLastChild, View convertView, final ViewGroup parent) {
             GroupInfo info = getGroupInfo(groupPosition);
+            
             if (info.animating) {
+                // If this group is animating, return the a DummyView...
                 if (convertView == null) {
                     convertView = new DummyView(parent.getContext());
                     convertView.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT, 0));
                 }
                 
                 if (childPosition < info.firstChildPosition) {
+                    // The reason why we do this is to support the collapse
+                    // this group when the group view is not visible but the 
+                    // children of this group are. When notifyDataSetChanged
+                    // is called, the ExpandableListView tries to keep the 
+                    // list position the same by saving the first visible item
+                    // and jumping back to that item after the views have been
+                    // refreshed. Now the problem is, if a group has 2 items
+                    // and the first visible item is the 2nd child of the group
+                    // and this group is collapsed, then the dummy view will be 
+                    // used for the group. But now the group only has 1 item 
+                    // which is the dummy view, thus when the ListView is trying
+                    // to restore the scroll position, it will try to jump to 
+                    // the second item of the group. But this group no longer
+                    // has a second item, so it is forced to jump to the next
+                    // group. This will cause a very ugly visual glitch. So
+                    // the way that we counteract this is by creating as many
+                    // dummy views as we need to maintain the scroll position
+                    // of the ListView after notifyDataSetChanged has been 
+                    // called.
                     convertView.getLayoutParams().height = 0;
                     return convertView;
                 }
@@ -316,10 +337,14 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 final ExpandableListView listView = (ExpandableListView) parent;
                 
                 DummyView dummyView = (DummyView) convertView;
+                
+                // Clear the views that the dummy view draws.
                 dummyView.clearViews();
                 
+                // Set the style of the divider
                 dummyView.setDivider(listView.getDivider(), parent.getMeasuredWidth(), listView.getDividerHeight());
                 
+                // Make measure specs to measure child views
                 final int measureSpecW = MeasureSpec.makeMeasureSpec(parent.getWidth(), MeasureSpec.EXACTLY);
                 final int measureSpecH = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
 
@@ -425,6 +450,10 @@ public class AnimatedExpandableListView extends ExpandableListView {
             divider.setBounds(0, 0, dividerWidth, dividerHeight);
         }
 
+        /**
+         * Add a view for the DummyView to draw.
+         * @param childView View to draw
+         */
         public void addFakeView(View childView) {
             childView.layout(0, 0, getWidth(), getHeight());
             views.add(childView);

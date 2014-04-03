@@ -17,7 +17,81 @@ import android.widget.ExpandableListAdapter;
 import android.widget.ExpandableListView;
 import android.view.animation.Transformation;
 
+/**
+ * This class defines an ExpandableListView which supports animations for
+ * collapsing and expanding groups.
+ */
 public class AnimatedExpandableListView extends ExpandableListView {
+    /*
+     * A detailed explanation for how this class works:
+     * 
+     * Animating the ExpandableListView was no easy task. The way that this
+     * class does it is by exploiting how an ExpandableListView works.
+     * 
+     * Normally when {@link ExpandableListView#collapseGroup(int)} or 
+     * {@link ExpandableListView#expandGroup(int)} is called, the view toggles 
+     * the flag for a group and calls notifyDataSetChanged to cause the ListView
+     * to refresh all of it's view. This time however, depending on whether a
+     * group is expanded or collapsed, certain childViews will either be ignored
+     * or added to the list.
+     * 
+     * Knowing this, we can come up with a way to animate our views. For 
+     * instance for group expansion, we tell the adapter to animate the
+     * children of a certain group. We then expand the group which causes the
+     * ExpandableListView to refresh all views on screen. The way that 
+     * ExpandableListView does this is by calling getView() in the adapter.
+     * However since the adapter knows that we are animating a certain group,
+     * instead of returning the real views for the children of the group being 
+     * animated, it will return a fake dummy view. This dummy view will then
+     * draw the real child views within it's dispatchDraw function. The reason
+     * we do this is so that we can animate all of it's children by simply 
+     * animating the dummy view. After we complete the animation, we tell the
+     * adapter to stop animating the group and call notifyDataSetChanged. Now
+     * the ExpandableListView is forced to refresh it's views again, except this
+     * time, it will get the real views for the expanded group.
+     * 
+     * So, to list it all out, when {@link #expandGroupWithAnimation(int)} is
+     * called the following happens:
+     * 
+     * 1. The ExpandableListView tells the adapter to animate a certain group.
+     * 2. The ExpandableListView calls expandGroup.
+     * 3. ExpandGroup calls notifyDataSetChanged.
+     * 4. As an result, getChildView is called for expanding group.
+     * 5. Since the adapter is in "animating mode", it will return a dummy view.
+     * 6. This dummy view draws the actual children of the expanding group.
+     * 7. This dummy view's height is animated from 0 to it's expanded height.
+     * 8. Once the animation completes, the adapter is notified to stop
+     *    animating the group and notifyDataSetChanged is called again.
+     * 9. This forces the ExpandableListView to refresh all of it's views again.
+     * 10.This time when getChildView is called, it will return the actual
+     *    child views. 
+     *    
+     * For animating the collapse of a group is a bit more difficult since we
+     * can't call collapseGroup from the start as it would just ignore the
+     * child items, giving up no chance to do any sort of animation. Instead
+     * what we have to do is play the animation first and call collapseGroup
+     * after the animation is done.
+     * 
+     * So, to list it all out, when {@link #collapseGroupWithAnimation(int)} is
+     * called the following happens:
+     * 
+     * 1. The ExpandableListView tells the adapter to animate a certain group.
+     * 2. The ExpandableListView calls notifyDataSetChanged.
+     * 3. As an result, getChildView is called for expanding group.
+     * 4. Since the adapter is in "animating mode", it will return a dummy view.
+     * 5. This dummy view draws the actual children of the expanding group.
+     * 6. This dummy view's height is animated from it's current height to 0.
+     * 7. Once the animation completes, the adapter is notified to stop
+     *    animating the group and notifyDataSetChanged is called again.
+     * 8. collapseGroup is finally called.
+     * 9. This forces the ExpandableListView to refresh all of it's views again.
+     * 10.This time when the ListView will not get any of the child views for 
+     *    the collapsed group.
+     */
+    
+    /**
+     * The duration of the expand/collapse animations
+     */
     private static final int ANIMATION_DURATION = 300;
     
     private AnimatedExpandableListAdapter adapter;
@@ -34,8 +108,13 @@ public class AnimatedExpandableListView extends ExpandableListView {
         super(context, attrs, defStyle);
     }
     
+    /**
+     * @see ExpandableListView#setAdapter(ExpandableListAdapter)
+     */
     public void setAdapter(ExpandableListAdapter adapter) {
         super.setAdapter(adapter);
+        
+        // Make sure that the adapter extends AnimatedExpandableListAdapter
         if(adapter instanceof AnimatedExpandableListAdapter) {
             this.adapter = (AnimatedExpandableListAdapter) adapter;
             this.adapter.setParent(this);
@@ -44,28 +123,75 @@ public class AnimatedExpandableListView extends ExpandableListView {
         }
     }
     
+    /**
+     * Expands the given group with an animation.
+     * @param groupPos The position of the group to expand
+     * @return  Returns true if the group was expanded. False if the group was
+     *          already expanded.
+     */
     public boolean expandGroupWithAnimation(int groupPos) {
-        if (groupPos + 1 == adapter.getGroupCount()) {
-            return expandGroup(groupPos);
-        }
-        int childPos = getPackedPositionChild(getExpandableListPosition(getFirstVisiblePosition()));
-        childPos = childPos == -1 ? 0 : childPos;
-        adapter.startExpandAnimation(groupPos, childPos);
-        return expandGroup(groupPos);
-    }
-    
-    public boolean collapseGroupWithAnimation(int groupPos) {
         int groupFlatPos = getFlatListPosition(getPackedPositionForGroup(groupPos));
         if (groupFlatPos != -1) {
-            View v = getChildAt(groupFlatPos - getFirstVisiblePosition());
-            if (v.getBottom() >= getBottom()) {
-                return collapseGroup(groupPos);
+            int childIndex = groupFlatPos - getFirstVisiblePosition();
+            if (childIndex < getChildCount()) {
+                // Get the view for the group is it is on screen...
+                View v = getChildAt(childIndex);
+                if (v.getBottom() >= getBottom()) {
+                    // If the user is not going to be able to see the animation
+                    // we just expand the group without an animation.
+                    // This resolves the case where getChildView will not be
+                    // called if the children of the group is not on screen
+                    return expandGroup(groupPos);
+                }
             }
         }
         
-        int childPos = getPackedPositionChild(getExpandableListPosition(getFirstVisiblePosition()));
-        childPos = childPos == -1 ? 0 : childPos;
-        adapter.startCollapseAnimation(groupPos, childPos);
+        // Let the adapter know that we are starting the animation...
+        adapter.startExpandAnimation(groupPos, 0);
+        // Finally call expandGroup (note that expandGroup will call
+        // notifyDataSetChanged so we don't need to)
+        return expandGroup(groupPos);
+    }
+    
+    /**
+     * Collapses the given group with an animation.
+     * @param groupPos The position of the group to collapse
+     * @return  Returns true if the group was collapsed. False if the group was
+     *          already collapsed.
+     */
+    public boolean collapseGroupWithAnimation(int groupPos) {
+        int groupFlatPos = getFlatListPosition(getPackedPositionForGroup(groupPos));
+        if (groupFlatPos != -1) {
+            int childIndex = groupFlatPos - getFirstVisiblePosition();
+            if (childIndex < getChildCount()) {
+                // Get the view for the group is it is on screen...
+                View v = getChildAt(childIndex);
+                if (v.getBottom() >= getBottom()) {
+                    // If the user is not going to be able to see the animation
+                    // we just collapse the group without an animation.
+                    // This resolves the case where getChildView will not be
+                    // called if the children of the group is not on screen
+                    return collapseGroup(groupPos);
+                }
+            }
+        }
+        
+        // Get the position of the firstChild visible from the top of the screen
+        long packedPos = getExpandableListPosition(getFirstVisiblePosition());
+        int firstChildPos = getPackedPositionChild(packedPos);
+        int firstGroupPos = getPackedPositionGroup(packedPos);
+        
+        // If the first visible view on the screen is a child view AND it's a
+        // child of the group we are trying to collapse, then set that
+        // as the first child position of the group... see
+        // {@link #startCollapseAnimation(int, int)} for why this is necessary
+        firstChildPos = firstChildPos == -1 || firstGroupPos != groupPos ? 0 : firstChildPos;
+        
+        // Let the adapter know that we are going to start animating the 
+        // collapse animation.
+        adapter.startCollapseAnimation(groupPos, firstChildPos);
+        
+        // Force the listview to refresh it's views
         adapter.notifyDataSetChanged();
         return isGroupExpanded(groupPos);
     }
@@ -74,18 +200,33 @@ public class AnimatedExpandableListView extends ExpandableListView {
         return ANIMATION_DURATION;
     }
     
+    /**
+     * Used for holding information regarding the group.
+     */
     private static class GroupInfo {
         boolean animating = false;
         boolean expanding = false;
         int firstChildPosition;
+        
+        /**
+         * This variable contains the last known height value of the dummy view.
+         * We save this information so that if the user collapses a group
+         * before it fully expands, the collapse animation will start from the
+         * CURRENT height of the dummy view and not from the full expanded 
+         * height.
+         */
         int dummyHeight = -1;
     }
     
+    /**
+     * A specialized adapter for use with the AnimatedExpandableListView. All
+     * adapters used with AnimatedExpandableListView MUST extend this class.
+     */
     public static abstract class AnimatedExpandableListAdapter extends BaseExpandableListAdapter {
         private SparseArray<GroupInfo> groupInfo = new SparseArray<GroupInfo>();
         private AnimatedExpandableListView parent;
         
-        public void setParent(AnimatedExpandableListView parent) {
+        private void setParent(AnimatedExpandableListView parent) {
             this.parent = parent;
         }
         
@@ -100,7 +241,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
         public abstract View getRealChildView(int groupPosition, int childPosition, boolean isLastChild, View convertView, ViewGroup parent);
         public abstract int getRealChildrenCount(int groupPosition);
         
-        public GroupInfo getGroupInfo(int groupPosition) {
+        private GroupInfo getGroupInfo(int groupPosition) {
             GroupInfo info = groupInfo.get(groupPosition);
             if (info == null) {
                 info = new GroupInfo();
@@ -109,40 +250,55 @@ public class AnimatedExpandableListView extends ExpandableListView {
             return info;
         }
         
-        public void startExpandAnimation(int groupPosition, int firstChildPosition) {
+        private void startExpandAnimation(int groupPosition, int firstChildPosition) {
             GroupInfo info = getGroupInfo(groupPosition);
             info.animating = true;
             info.firstChildPosition = firstChildPosition;
             info.expanding = true;
         }
         
-        public void startCollapseAnimation(int groupPosition, int firstChildPosition) {
+        private void startCollapseAnimation(int groupPosition, int firstChildPosition) {
             GroupInfo info = getGroupInfo(groupPosition);
             info.animating = true;
             info.firstChildPosition = firstChildPosition;
             info.expanding = false;
         }
         
-        public void stopAnimation(int groupPosition) {
+        private void stopAnimation(int groupPosition) {
             GroupInfo info = getGroupInfo(groupPosition);
             info.animating = false;
         }
 
+        /**
+         * Override {@link #getRealChildType(int, int)} instead.
+         */
         @Override
         public final int getChildType(int groupPosition, int childPosition) {
             GroupInfo info = getGroupInfo(groupPosition);
             if (info.animating) {
+                // If we are animating this group, then all of it's children 
+                // are going to be dummy views which we will say is type 0.
                 return 0;
             } else {
+                // If we are not animating this group, then we will add 1 to
+                // the type it has so that no type id conflicts will occur
+                // unless getRealChildType() returns MAX_INT
                 return getRealChildType(groupPosition, childPosition) + 1;
             }
         }
         
+        /**
+         * Override {@link #getRealChildTypeCount()} instead.
+         */
         @Override
         public final int getChildTypeCount() {
+            // Return 1 more than the childTypeCount to account for DummyView
             return getRealChildTypeCount() + 1;
         }
 
+        /**
+         * Override {@link #getChildView(int, int, boolean, View, ViewGroup)} instead.
+         */
         @Override
         public final View getChildView(final int groupPosition, int childPosition, boolean isLastChild, View convertView, final ViewGroup parent) {
             GroupInfo info = getGroupInfo(groupPosition);

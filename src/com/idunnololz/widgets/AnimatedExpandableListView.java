@@ -361,8 +361,11 @@ public class AnimatedExpandableListView extends ExpandableListView {
                         // we only need to draw enough views to fool the user...
                         dummyView.addFakeView(childView);
                     } else {
-                        // if this group has too many views, we don't want to calculate the height
-                        // of everything... just do a light approximation...
+                        dummyView.addFakeView(childView);
+                        
+                        // if this group has too many views, we don't want to 
+                        // calculate the height of everything... just do a light 
+                        // approximation and break
                         int averageHeight = totalHeight / (i + 1);
                         totalHeight += (len - i - 1) * averageHeight;
                         break;

@@ -163,7 +163,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
         int groupFlatPos = getFlatListPosition(getPackedPositionForGroup(groupPos));
         if (groupFlatPos != -1) {
             int childIndex = groupFlatPos - getFirstVisiblePosition();
-            if (childIndex < getChildCount()) {
+            if (childIndex >= 0 && childIndex < getChildCount()) {
                 // Get the view for the group is it is on screen...
                 View v = getChildAt(childIndex);
                 if (v.getBottom() >= getBottom()) {
@@ -173,6 +173,10 @@ public class AnimatedExpandableListView extends ExpandableListView {
                     // called if the children of the group is not on screen
                     return collapseGroup(groupPos);
                 }
+            } else {
+                // If the group is offscreen, we can just collapse it without an
+                // animation...
+                return collapseGroup(groupPos);
             }
         }
         

@@ -301,7 +301,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
          */
         @Override
         public final View getChildView(final int groupPosition, int childPosition, boolean isLastChild, View convertView, final ViewGroup parent) {
-            GroupInfo info = getGroupInfo(groupPosition);
+            final GroupInfo info = getGroupInfo(groupPosition);
             
             if (info.animating) {
                 // If this group is animating, return the a DummyView...
@@ -396,6 +396,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
                         info.dummyHeight = totalHeight;
                     }
                     
+                    dummyView.clearAnimation();
                     ExpandAnimation ani = new ExpandAnimation(dummyView, info.dummyHeight, 0, info);
                     ani.setDuration(this.parent.getAnimationDuration());
                     ani.setAnimationListener(new AnimationListener() {
@@ -405,6 +406,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
                             stopAnimation(groupPosition);
                             listView.collapseGroup(groupPosition);
                             notifyDataSetChanged();
+                            info.dummyHeight = -1;
                         }
 
                         @Override

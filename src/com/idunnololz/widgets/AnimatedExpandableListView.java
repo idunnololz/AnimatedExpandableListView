@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.Animation.AnimationListener;
+import android.widget.AbsListView;
 import android.widget.BaseExpandableListAdapter;
 import android.widget.ExpandableListAdapter;
 import android.widget.ExpandableListView;
@@ -307,7 +308,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 // If this group is animating, return the a DummyView...
                 if (convertView == null) {
                     convertView = new DummyView(parent.getContext());
-                    convertView.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT, 0));
+                    convertView.setLayoutParams(new AbsListView.LayoutParams(LayoutParams.MATCH_PARENT, 0));
                 }
                 
                 if (childPosition < info.firstChildPosition) {

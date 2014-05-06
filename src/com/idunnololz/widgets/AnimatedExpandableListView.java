@@ -145,6 +145,10 @@ public class AnimatedExpandableListView extends ExpandableListView {
                     // we just expand the group without an animation.
                     // This resolves the case where getChildView will not be
                     // called if the children of the group is not on screen
+                    
+                    // We need to notify the adapter that the group was expanded
+                    // without it's knowledge
+                    adapter.notifyGroupExpanded(groupPos);
                     return expandGroup(groupPos);
                 }
             }
@@ -260,6 +264,11 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 groupInfo.put(groupPosition, info);
             }
             return info;
+        }
+        
+        public void notifyGroupExpanded(int groupPosition) {
+            GroupInfo info = getGroupInfo(groupPosition);
+            info.dummyHeight = -1;
         }
         
         private void startExpandAnimation(int groupPosition, int firstChildPosition) {

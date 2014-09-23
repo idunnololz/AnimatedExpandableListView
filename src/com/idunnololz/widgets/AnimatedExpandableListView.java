@@ -3,9 +3,11 @@ package com.idunnololz.widgets;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.view.View;
@@ -90,7 +92,8 @@ public class AnimatedExpandableListView extends ExpandableListView {
      *    the collapsed group.
      */
 
-    private static final String TAG = AnimatedExpandableListAdapter.class.getSimpleName();
+    @SuppressWarnings("unused")
+	private static final String TAG = AnimatedExpandableListAdapter.class.getSimpleName();
 
     /**
      * The duration of the expand/collapse animations
@@ -132,7 +135,13 @@ public class AnimatedExpandableListView extends ExpandableListView {
      * @return  Returns true if the group was expanded. False if the group was
      *          already expanded.
      */
+    @SuppressLint("NewApi") 
     public boolean expandGroupWithAnimation(int groupPos) {
+    	boolean lastGroup = groupPos == adapter.getGroupCount() - 1;
+    	if (lastGroup && Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+    		return expandGroup(groupPos, true);
+    	}
+    	
         int groupFlatPos = getFlatListPosition(getPackedPositionForGroup(groupPos));
         if (groupFlatPos != -1) {
             int childIndex = groupFlatPos - getFirstVisiblePosition();

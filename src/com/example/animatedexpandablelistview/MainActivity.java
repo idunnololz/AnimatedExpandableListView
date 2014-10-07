@@ -1,5 +1,7 @@
 package com.example.animatedexpandablelistview;
 
+import java.lang.Long;
+import java.lang.Override;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,6 +11,10 @@ import com.idunnololz.widgets.AnimatedExpandableListView.AnimatedExpandableListA
 import android.os.Bundle;
 import android.app.Activity;
 import android.content.Context;
+import android.os.Debug;
+import android.os.SystemClock;
+import android.util.Log;
+import android.util.LruCache;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +32,8 @@ import android.widget.TextView;
 public class MainActivity extends Activity {
     private AnimatedExpandableListView listView;
     private ExampleAdapter adapter;
+
+    private static final String TAG = "idun";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,12 +77,21 @@ public class MainActivity extends Activity {
                 if (listView.isGroupExpanded(groupPosition)) {
                     listView.collapseGroupWithAnimation(groupPosition);
                 } else {
+                    String traceName = "method_trace_idun_" + SystemClock.uptimeMillis();
+//                    Debug.startMethodTracing(traceName);
                     listView.expandGroupWithAnimation(groupPosition);
                 }
                 return true;
             }
             
         });
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+//        Debug.stopMethodTracing();
     }
     
     private static class GroupItem {
@@ -90,6 +107,7 @@ public class MainActivity extends Activity {
     private static class ChildHolder {
         TextView title;
         TextView hint;
+        int type;
     }
     
     private static class GroupHolder {
@@ -103,9 +121,12 @@ public class MainActivity extends Activity {
         private LayoutInflater inflater;
         
         private List<GroupItem> items;
+
+        private LruCache<Long, View> vcache;
         
         public ExampleAdapter(Context context) {
-             inflater = LayoutInflater.from(context);
+            inflater = LayoutInflater.from(context);
+            vcache = new LruCache<Long, View>(20);
         }
 
         public void setData(List<GroupItem> items) {
@@ -127,18 +148,33 @@ public class MainActivity extends Activity {
             ChildHolder holder;
             ChildItem item = getChild(groupPosition, childPosition);
             if (convertView == null) {
-                holder = new ChildHolder();
-                convertView = inflater.inflate(R.layout.list_item, parent, false);
-                holder.title = (TextView) convertView.findViewById(R.id.textTitle);
-                holder.hint = (TextView) convertView.findViewById(R.id.textHint);
-                convertView.setTag(holder);
+                // when convertView is not given, we try using view from cache.
+                // Note: check the view type to ensure it's really resuable.
+                Long key = ((long)groupPosition << 32) + childPosition;
+                View view = vcache.get(key);
+                if (view != null && view.getTag() != null) {
+                    holder = (ChildHolder) view.getTag();
+                    if (holder.type == getRealChildType(groupPosition, childPosition) ) {
+                        convertView = view;
+                        Log.d(TAG, "getRealChildView: " + groupPosition + " " + childPosition + " " + "Got Cache!");
+                    }
+                } else {
+                    holder = new ChildHolder();
+                    convertView = inflater.inflate(R.layout.list_item, parent, false);
+                    holder.title = (TextView) convertView.findViewById(R.id.textTitle);
+                    holder.hint = (TextView) convertView.findViewById(R.id.textHint);
+                    convertView.setTag(holder);
+                    vcache.put(key, convertView);
+                    Log.d(TAG, "getRealChildView: " + groupPosition + " " + childPosition + " " + "No Cache!");
+                }
             } else {
+                Log.d(TAG, "getRealChildView: " + groupPosition + " " + childPosition + " " + convertView);
                 holder = (ChildHolder) convertView.getTag();
             }
-            
+
             holder.title.setText(item.title);
             holder.hint.setText(item.hint);
-            
+
             return convertView;
         }
 

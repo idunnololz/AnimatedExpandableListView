@@ -20,5 +20,12 @@ This perforamnce issue may not be obvious when the child view is simple, but we 
 
 The root cause is that convertView is not given during animation, and the same child view needs to get initiated after animation. The LRU cache is used to hold the child to be reused. 
 
-The tuning result can be seen from the trace grahp. Before this tuning, a group with 5 child needs 10 times of getting new view. With this view cache, 5 times are just enough to go.
+The tuning result can be seen from the trace graphs. Before this tuning, a group with 5 child needs 10 times of getting new view. With this view cache, 5 times are just enough to go.
 
+See TRACEVIEW graphs below as a comparison:
+
+Before:
+![image](https://github.com/neokidd/AnimatedExpandableListView/blob/master/docs/example_activity_no_cache_view_10times_inflate.png)
+
+After:
+![image](https://github.com/neokidd/AnimatedExpandableListView/blob/master/docs/cache_view_5times_inflate.png)

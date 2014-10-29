@@ -518,17 +518,17 @@ public class AnimatedExpandableListView extends ExpandableListView {
          * @param childView View to draw
          */
         public void addFakeView(View childView) {
-            childView.layout(0, 0, getWidth(), getHeight());
+            childView.layout(0, 0, getWidth(), childView.getMeasuredHeight());
             views.add(childView);
         }
-
+        
         @Override
         protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
             super.onLayout(changed, left, top, right, bottom);
             final int len = views.size();
             for(int i = 0; i < len; i++) {
                 View v = views.get(i);
-                v.layout(left, top, right, bottom);
+                v.layout(left, top, left + v.getMeasuredWidth(), top + v.getMeasuredHeight());
             }
         }
 

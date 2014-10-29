@@ -324,6 +324,11 @@ public class AnimatedExpandableListView extends ExpandableListView {
             // Return 1 more than the childTypeCount to account for DummyView
             return getRealChildTypeCount() + 1;
         }
+        
+        protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
+            return new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                ViewGroup.LayoutParams.WRAP_CONTENT, 0);
+        }
 
         /**
          * Override {@link #getChildView(int, int, boolean, View, ViewGroup)} instead.
@@ -383,15 +388,31 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 final int len = getRealChildrenCount(groupPosition);
                 for (int i = info.firstChildPosition; i < len; i++) {
                     View childView = getRealChildView(groupPosition, i, (i == len - 1), null, parent);
-                    childView.measure(measureSpecW, measureSpecH);
+                    
+                    LayoutParams p = (LayoutParams) childView.getLayoutParams();
+                    if (p == null) {
+                        p = (AbsListView.LayoutParams) generateDefaultLayoutParams();
+                        childView.setLayoutParams(p);
+                    }
+                    
+                    int lpHeight = p.height;
+                    
+                    int childHeightSpec;
+                    if (lpHeight > 0) {
+                        childHeightSpec = MeasureSpec.makeMeasureSpec(lpHeight, MeasureSpec.EXACTLY);
+                    } else {
+                        childHeightSpec = measureSpecH;
+                    }
+                    
+                    childView.measure(measureSpecW, childHeightSpec);
                     totalHeight += childView.getMeasuredHeight();
-
+                    
                     if (totalHeight < clipHeight) {
                         // we only need to draw enough views to fool the user...
                         dummyView.addFakeView(childView);
                     } else {
                         dummyView.addFakeView(childView);
-
+                        
                         // if this group has too many views, we don't want to
                         // calculate the height of everything... just do a light
                         // approximation and break

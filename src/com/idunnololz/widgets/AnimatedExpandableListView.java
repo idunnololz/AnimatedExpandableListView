@@ -519,20 +519,26 @@ public class AnimatedExpandableListView extends ExpandableListView {
         public void dispatchDraw(Canvas canvas) {
             canvas.save();
             if(divider != null) {
-	            divider.setBounds(0, 0, dividerWidth, dividerHeight);
+                divider.setBounds(0, 0, dividerWidth, dividerHeight);
             }
-
+            
             final int len = views.size();
             for(int i = 0; i < len; i++) {
                 View v = views.get(i);
+                
+                canvas.save();
+                canvas.clipRect(0, 0, getWidth(), v.getMeasuredHeight());
                 v.draw(canvas);
+                canvas.restore();
+                
+                if(divider != null) {
+                    divider.draw(canvas);
+                    canvas.translate(0, dividerHeight);
+                }
+                
                 canvas.translate(0, v.getMeasuredHeight());
-	            if(divider != null) {
-		            divider.draw(canvas);
-		            canvas.translate(0, dividerHeight);
-	            }
             }
-
+            
             canvas.restore();
         }
     }

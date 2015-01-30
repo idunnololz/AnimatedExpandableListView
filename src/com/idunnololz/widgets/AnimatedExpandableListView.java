@@ -340,6 +340,11 @@ public class AnimatedExpandableListView extends ExpandableListView {
             // Return 1 more than the childTypeCount to account for DummyView
             return getRealChildTypeCount() + 1;
         }
+        
+        protected ViewGroup.LayoutParams generateDefaultLayoutParams() {
+            return new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                                ViewGroup.LayoutParams.WRAP_CONTENT, 0);
+        }
 
         /**
          * Override {@link #getChildView(int, int, boolean, View, ViewGroup)} instead.
@@ -399,15 +404,31 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 final int len = getRealChildrenCount(groupPosition);
                 for (int i = info.firstChildPosition; i < len; i++) {
                     View childView = getRealChildView(groupPosition, i, (i == len - 1), null, parent);
-                    childView.measure(measureSpecW, measureSpecH);
+                    
+                    LayoutParams p = (LayoutParams) childView.getLayoutParams();
+                    if (p == null) {
+                        p = (AbsListView.LayoutParams) generateDefaultLayoutParams();
+                        childView.setLayoutParams(p);
+                    }
+                    
+                    int lpHeight = p.height;
+                    
+                    int childHeightSpec;
+                    if (lpHeight > 0) {
+                        childHeightSpec = MeasureSpec.makeMeasureSpec(lpHeight, MeasureSpec.EXACTLY);
+                    } else {
+                        childHeightSpec = measureSpecH;
+                    }
+                    
+                    childView.measure(measureSpecW, childHeightSpec);
                     totalHeight += childView.getMeasuredHeight();
-
+                    
                     if (totalHeight < clipHeight) {
                         // we only need to draw enough views to fool the user...
                         dummyView.addFakeView(childView);
                     } else {
                         dummyView.addFakeView(childView);
-
+                        
                         // if this group has too many views, we don't want to
                         // calculate the height of everything... just do a light
                         // approximation and break
@@ -513,17 +534,17 @@ public class AnimatedExpandableListView extends ExpandableListView {
          * @param childView View to draw
          */
         public void addFakeView(View childView) {
-            childView.layout(0, 0, getWidth(), getHeight());
+            childView.layout(0, 0, getWidth(), childView.getMeasuredHeight());
             views.add(childView);
         }
-
+        
         @Override
         protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
             super.onLayout(changed, left, top, right, bottom);
             final int len = views.size();
             for(int i = 0; i < len; i++) {
                 View v = views.get(i);
-                v.layout(left, top, right, bottom);
+                v.layout(left, top, left + v.getMeasuredWidth(), top + v.getMeasuredHeight());
             }
         }
 
@@ -535,20 +556,26 @@ public class AnimatedExpandableListView extends ExpandableListView {
         public void dispatchDraw(Canvas canvas) {
             canvas.save();
             if(divider != null) {
-	            divider.setBounds(0, 0, dividerWidth, dividerHeight);
+                divider.setBounds(0, 0, dividerWidth, dividerHeight);
             }
-
+            
             final int len = views.size();
             for(int i = 0; i < len; i++) {
                 View v = views.get(i);
+                
+                canvas.save();
+                canvas.clipRect(0, 0, getWidth(), v.getMeasuredHeight());
                 v.draw(canvas);
+                canvas.restore();
+                
+                if(divider != null) {
+                    divider.draw(canvas);
+                    canvas.translate(0, dividerHeight);
+                }
+                
                 canvas.translate(0, v.getMeasuredHeight());
-	            if(divider != null) {
-		            divider.draw(canvas);
-		            canvas.translate(0, dividerHeight);
-	            }
             }
-
+            
             canvas.restore();
         }
     }

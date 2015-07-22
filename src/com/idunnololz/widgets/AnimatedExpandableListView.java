@@ -114,7 +114,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
     /**
      * The duration of the expand/collapse animations
      */
-    private static final int ANIMATION_DURATION = 300;
+    private static final int ANIMATION_DURATION = 600;
 
     private AnimatedExpandableListAdapter adapter;
 
@@ -442,7 +442,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 int state = (o = dummyView.getTag()) == null ? STATE_IDLE : (Integer) o;
 
                 if (info.expanding && state != STATE_EXPANDING) {
-                    ExpandAnimation ani = new ExpandAnimation(dummyView, 0, totalHeight, info);
+                    ExpandAnimation ani = new ExpandAnimation(dummyView, 0, totalHeight+(27*totalHeight/100), info);
                     ani.setDuration(this.parent.getAnimationDuration());
                     ani.setAnimationListener(new AnimationListener() {
 

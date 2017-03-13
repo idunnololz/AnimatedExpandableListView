@@ -130,6 +130,44 @@ public class AnimatedExpandableListView extends ExpandableListView {
         super(context, attrs, defStyle);
     }
 
+    @Override
+    protected void detachAllViewsFromParent() {
+        for (int i = getChildCount() - 1; i >= 0; i--) {
+            detachDummyView(getChildAt(i));
+        }
+        super.detachAllViewsFromParent();
+    }
+
+    @Override
+    protected void detachViewFromParent(View child) {
+        detachDummyView(child);
+        super.detachViewFromParent(child);
+    }
+
+    @Override
+    protected void detachViewFromParent(int index) {
+        detachDummyView(getChildAt(index));
+        super.detachViewFromParent(index);
+    }
+
+    @Override
+    protected void detachViewsFromParent(int start, int count) {
+        for (int i = start + count - 1; i >= start; i--) {
+            detachDummyView(getChildAt(i));
+        }
+        super.detachViewsFromParent(start, count);
+    }
+
+    private void detachDummyView(View child) {
+        if (child instanceof DummyView) {
+            int pos = getPositionForView(child);
+            int groupPos = getPackedPositionGroup(getExpandableListPosition(pos));
+            if (!adapter.isAnimating(groupPos)) {
+                ((DummyView) child).removeAllViewsInLayout();
+            }
+        }
+    }
+
     /**
      * @see ExpandableListView#setAdapter(ExpandableListAdapter)
      */
@@ -141,7 +179,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
             this.adapter = (AnimatedExpandableListAdapter) adapter;
             this.adapter.setParent(this);
         } else {
-            throw new ClassCastException(adapter.toString() + " must implement AnimatedExpandableListAdapter");
+            throw new ClassCastException(adapter + " must implement AnimatedExpandableListAdapter");
         }
     }
 
@@ -288,6 +326,11 @@ public class AnimatedExpandableListView extends ExpandableListView {
                 groupInfo.put(groupPosition, info);
             }
             return info;
+        }
+
+        public boolean isAnimating(int groupPosition) {
+            GroupInfo info = getGroupInfo(groupPosition);
+            return info.animating;
         }
 
         public void notifyGroupExpanded(int groupPosition) {
@@ -509,8 +552,7 @@ public class AnimatedExpandableListView extends ExpandableListView {
 
     }
 
-    private static class DummyView extends View {
-        private List<View> views = new ArrayList<View>();
+    private static class DummyView extends ViewGroup {
         private Drawable divider;
         private int dividerWidth;
         private int dividerHeight;
@@ -534,49 +576,47 @@ public class AnimatedExpandableListView extends ExpandableListView {
          * @param childView View to draw
          */
         public void addFakeView(View childView) {
-            childView.layout(0, 0, getWidth(), childView.getMeasuredHeight());
-            views.add(childView);
+            if (childView.getParent() != null) {
+                ((ViewGroup) childView.getParent()).removeView(childView);
+            }
+            addViewInLayout(childView, -1, childView.getLayoutParams(), true);
         }
-        
+
         @Override
         protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-            super.onLayout(changed, left, top, right, bottom);
-            final int len = views.size();
+            final int len = getChildCount();
+            int childTop = 0;
             for(int i = 0; i < len; i++) {
-                View v = views.get(i);
-                v.layout(left, top, left + v.getMeasuredWidth(), top + v.getMeasuredHeight());
+                View v = getChildAt(i);
+                v.layout(0, childTop, v.getMeasuredWidth(), childTop + v.getMeasuredHeight());
+                childTop += v.getMeasuredHeight() + dividerHeight;
             }
         }
 
         public void clearViews() {
-            views.clear();
+            removeAllViewsInLayout();
         }
 
         @Override
         public void dispatchDraw(Canvas canvas) {
-            canvas.save();
+            super.dispatchDraw(canvas);
+            int saveCount = canvas.save();
             if(divider != null) {
                 divider.setBounds(0, 0, dividerWidth, dividerHeight);
             }
-            
-            final int len = views.size();
+
+            final int len = getChildCount();
             for(int i = 0; i < len; i++) {
-                View v = views.get(i);
-                
-                canvas.save();
-                canvas.clipRect(0, 0, getWidth(), v.getMeasuredHeight());
-                v.draw(canvas);
-                canvas.restore();
-                
+                View v = getChildAt(i);
+
                 if(divider != null) {
+                    canvas.translate(0, v.getBottom() - dividerHeight);
                     divider.draw(canvas);
-                    canvas.translate(0, dividerHeight);
+                    canvas.translate(0, -(v.getBottom() - dividerHeight));
                 }
-                
-                canvas.translate(0, v.getMeasuredHeight());
             }
-            
-            canvas.restore();
+
+            canvas.restoreToCount(saveCount);
         }
     }
 
